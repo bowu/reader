@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
@@ -13,15 +13,19 @@ interface PDFViewerProps {
   isDarkMode: boolean;
   onThemeToggle: () => void;
   onClose: () => void;
+  onCapture: (data: string) => void;
 }
 
-const PDFViewer: React.FC<PDFViewerProps> = ({ file, isDarkMode, onThemeToggle, onClose }) => {
+const PDFViewer: React.FC<PDFViewerProps> = ({ file, isDarkMode, onThemeToggle, onClose, onCapture }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pages, setPages] = useState<number[]>([1]);
   const [isNavbarVisible, setIsNavbarVisible] = useState(true);
   const [scale, setScale] = useState(1);
+  const [lastCaptureTime, setLastCaptureTime] = useState<number>(0);
   const baseWidth = 900;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mainContentRef = useRef<HTMLDivElement>(null);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);
@@ -49,6 +53,75 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ file, isDarkMode, onThemeToggle, 
     const availableWidth = Math.min(window.innerWidth - (isNavbarVisible ? 400 : 100), baseWidth);
     return availableWidth;
   };
+
+  const captureAndSend = useCallback(() => {
+    const currentTime = Date.now();
+    if (currentTime - lastCaptureTime < 200) { // Debounce rapid captures
+      return;
+    }
+    setLastCaptureTime(currentTime);
+
+    if (canvasRef.current) {
+      try {
+        const canvas = canvasRef.current;
+        // Ensure the canvas has content before capturing
+        if (canvas.width === 0 || canvas.height === 0) {
+          console.warn('Canvas dimensions are zero, skipping capture');
+          return;
+        }
+
+        // Use a reasonable JPEG quality and optimize for text content
+        const base64 = canvas.toDataURL('image/jpeg', 0.85);
+        const data = base64.slice(base64.indexOf(',') + 1);
+        onCapture(data);
+      } catch (error) {
+        console.error('Error capturing PDF page:', error);
+      }
+    }
+  }, [canvasRef, onCapture, lastCaptureTime]);
+
+  // Optimize scroll capture with debouncing
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    const handleScroll = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        const container = mainContentRef.current;
+        if (!container) return;
+
+        // Find the most visible page
+        const pages = Array.from(container.getElementsByClassName('react-pdf__Page'));
+        let maxVisibleHeight = 0;
+        let mostVisiblePage = 1;
+
+        pages.forEach((page, index) => {
+          const rect = page.getBoundingClientRect();
+          const viewHeight = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
+          if (viewHeight > maxVisibleHeight) {
+            maxVisibleHeight = viewHeight;
+            mostVisiblePage = index + 1;
+          }
+        });
+
+        if (mostVisiblePage !== currentPage) {
+          setCurrentPage(mostVisiblePage);
+        }
+      }, 150); // Debounce time
+    };
+
+    const container = mainContentRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', handleScroll);
+      }
+      clearTimeout(timeoutId);
+    };
+  }, [currentPage, setCurrentPage]);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -115,7 +188,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ file, isDarkMode, onThemeToggle, 
       </div>
 
       {/* Main Content Area */}
-      <div className={`flex-1 overflow-y-auto ${isDarkMode ? 'bg-gray-900' : 'bg-[#FDF6E3]'} relative`}>
+      <div className={`flex-1 overflow-y-auto ${isDarkMode ? 'bg-gray-900' : 'bg-[#FDF6E3]'} relative`}
+        ref={mainContentRef}
+      >
         {/* Header with controls */}
         <div className={`sticky top-0 z-50 w-full ${
           isDarkMode ? 'bg-gray-800/90 text-gray-100' : 'bg-white/90 text-gray-800'

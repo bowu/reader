@@ -49,12 +49,41 @@ const PDFViewerWithGemini: React.FC<PDFViewerWithGeminiProps> = ({ file, isDarkM
     };
   }, [connected, client, audioRecorder]);
 
+  // Function to convert base64 to blob
+  const base64ToBlob = (base64: string, type: string) => {
+    const byteString = atob(base64.split(',')[1]);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type });
+  };
+
   // This function captures the PDF viewer and sends it as realtime input to Gemini.
   const captureAndSend = async () => {
     if (viewerRef.current && connected) {
       const canvas = await html2canvas(viewerRef.current);
-      const base64 = canvas.toDataURL("image/jpeg", 1.0);
+      const base64 = canvas.toDataURL("image/jpeg", 0.1);
       const data = base64.slice(base64.indexOf(",") + 1, Infinity);
+      
+      // Save the captured image using Blob and createObjectURL
+      try {
+        const blob = base64ToBlob(base64, 'image/jpeg');
+        const timestamp = new Date().getTime();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = url;
+        link.download = `capture_${timestamp}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(link);
+      } catch (err) {
+        console.error('Failed to save image:', err);
+      }
+
       client.sendRealtimeInput([{ mimeType: "image/jpeg", data }]);
     }
   };
@@ -62,10 +91,10 @@ const PDFViewerWithGemini: React.FC<PDFViewerWithGeminiProps> = ({ file, isDarkM
   // Capture and send PDF view periodically
   useEffect(() => {
     // Initial capture when component mounts
-    //captureAndSend();
+    captureAndSend();
 
     // Set up interval for periodic captures
-    const interval = setInterval(captureAndSend, 5000);
+    const interval = setInterval(captureAndSend, 10000);
 
     // Clean up interval on unmount
     return () => clearInterval(interval);
