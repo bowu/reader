@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { FileText } from 'lucide-react';
 import PDFUploader from './components/PDFUploader';
-import PDFViewer from './components/PDFViewer';
+import PDFViewerWithGemini from './components/PDFViewerWithGemini';
 import LoginPage from './components/LoginPage';
 import DocumentList from './components/DocumentList';
 import { supabase } from './lib/supabase';
 import type { User } from '@supabase/supabase-js';
+import { LiveAPIProvider } from './contexts/LiveAPIContext';
 
 interface Document {
   id: string;
@@ -14,6 +15,14 @@ interface Document {
   last_accessed: string;
   storage_path: string;
 }
+
+const API_KEY = process.env.GEMINI_API_KEY as string;
+if (typeof API_KEY !== "string") {
+  throw new Error("set GEMINI_API_KEY in .env");
+}
+
+const host = "generativelanguage.googleapis.com";
+const uri = `wss://${host}/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent`;
 
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -92,12 +101,14 @@ function App() {
           />
         </div>
       ) : (
-        <PDFViewer 
-          file={pdfFile} 
-          isDarkMode={isDarkMode} 
-          onThemeToggle={toggleTheme}
-          onClose={handleClosePDF}
-        />
+        <LiveAPIProvider apiKey={API_KEY} url={uri}>
+          <PDFViewerWithGemini
+            file={pdfFile} 
+            isDarkMode={isDarkMode} 
+            onThemeToggle={toggleTheme}
+            onClose={handleClosePDF}
+          />
+        </LiveAPIProvider>
       )}
     </div>
   );
