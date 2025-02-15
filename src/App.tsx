@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText } from 'lucide-react';
+import { FileText, Moon, Sun, LogOut } from 'lucide-react';
 import PDFUploader from './components/PDFUploader';
 import PDFViewerWithGemini from './components/PDFViewerWithGemini';
 import LoginPage from './components/LoginPage';
@@ -94,6 +94,25 @@ function App() {
     }`}>
       {!pdfFile ? (
         <div className="container mx-auto px-4 py-8">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">Your Documents</h1>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                aria-label="Toggle theme"
+              >
+                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+              >
+                <LogOut size={20} />
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
           <DocumentList
             documents={documents}
             onDocumentSelect={setPdfFile}
