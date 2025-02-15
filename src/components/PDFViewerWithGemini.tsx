@@ -66,25 +66,8 @@ const PDFViewerWithGemini: React.FC<PDFViewerWithGeminiProps> = ({ file, isDarkM
       const canvas = await html2canvas(viewerRef.current);
       const base64 = canvas.toDataURL("image/jpeg", 0.1);
       const data = base64.slice(base64.indexOf(",") + 1, Infinity);
-      
-      // Save the captured image using Blob and createObjectURL
-      try {
-        const blob = base64ToBlob(base64, 'image/jpeg');
-        const timestamp = new Date().getTime();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.style.display = 'none';
-        link.href = url;
-        link.download = `capture_${timestamp}.jpg`;
-        document.body.appendChild(link);
-        link.click();
-        URL.revokeObjectURL(url);
-        document.body.removeChild(link);
-      } catch (err) {
-        console.error('Failed to save image:', err);
-      }
-
       client.sendRealtimeInput([{ mimeType: "image/jpeg", data }]);
+      console.log("Sent image");
     }
   };
 
